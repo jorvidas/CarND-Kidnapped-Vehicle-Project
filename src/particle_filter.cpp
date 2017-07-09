@@ -140,7 +140,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
       // ASSOCIATE THE OBSERVATIONS WITH THE MAP
       // declare and set variables for distance of closest predicted observation and index
-      double min_distance = dist(transformed_obs[i].x, transformed_obs[i].y, map_landmarks.landmark_list[0].x_f, map_landmarks.landmark_list[0].y_f);
+      double min_distance = dist(current_transformation.x, current_transformation.y, map_landmarks.landmark_list[0].x_f, map_landmarks.landmark_list[0].y_f);
       int min_index = 0;
 
       // loop over remaining predicted observations
