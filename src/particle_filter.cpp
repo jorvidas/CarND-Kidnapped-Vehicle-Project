@@ -24,7 +24,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   //   x, y, theta and their uncertainties from GPS) and all weights to 1. 
   // Add random Gaussian noise to each particle.
   // NOTE: Consult particle_filter.h for more information about this method (and others in this file).
-  num_particles = 1;
+  num_particles = 100;
   default_random_engine gen;
   Particle particle;
 
@@ -39,8 +39,9 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     particle.theta = dist_theta(gen);
     particle.weight = 1;
     particles.push_back(particle);
-    // weights.push_back(1);
+    weights.push_back(1);
   }
+  is_initialized = true;
 }
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], double velocity, double yaw_rate) {
@@ -103,22 +104,25 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
   // for weight caclulation
   double normalizer = 1.0f / (2 * M_PI * std_landmark[0] * std_landmark[1]);
+  double exponent_x_normalizer = 2 * M_PI * std_landmark[0] * std_landmark[0];
+  double exponent_y_normalizer = 2 * M_PI * std_landmark[1] * std_landmark[1];
   double exponent_x;
   double exponent_y;
   double exponent;
+
+
 
   // loop over all particles
   for (int i = 0; i < particles.size(); i++) {
     // declare vector and LandmarkObs to keep track of translations
 
-    LandmarkObs current_translation;
+    LandmarkObs current_transformation;
     std::vector<int> map_associations;
+    std::vector<LandmarkObs> transformed_obs;
     long double particle_weight = 1;
     
     // loop over all observations for each particle
     for (int j = 0; j < observations.size(); j++) {
-
-      std::vector<LandmarkObs> translated_obs;
 
       // set x, y, and theta values
       double o_x = observations[j].x; 
@@ -128,23 +132,21 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       double p_theta = particles[i].theta; 
 
       // calculate transformation
-      current_translation.x = o_x * cos(p_theta) - o_y * sin(p_theta) + p_x;
-      current_translation.y = o_x * sin(p_theta) + o_y * cos(p_theta) + p_y;
+      current_transformation.x = o_x * cos(p_theta) - o_y * sin(p_theta) + p_x;
+      current_transformation.y = o_x * sin(p_theta) + o_y * cos(p_theta) + p_y;
 
       // add to vector tracking transformations
-      translated_obs.push_back(current_translation);
+      transformed_obs.push_back(current_transformation);
 
       // ASSOCIATE THE OBSERVATIONS WITH THE MAP
       // declare and set variables for distance of closest predicted observation and index
-      double min_distance = dist(translated_obs[i].x, translated_obs[i].y, map_landmarks.landmark_list[0].x_f, map_landmarks.landmark_list[0].y_f);
+      double min_distance = dist(transformed_obs[i].x, transformed_obs[i].y, map_landmarks.landmark_list[0].x_f, map_landmarks.landmark_list[0].y_f);
       int min_index = 0;
 
       // loop over remaining predicted observations
       for (int k = 1; k < map_landmarks.landmark_list.size(); k++) {
-
         // calculate distance of current predicted observation
-        double distance = dist(observations[j].x, observations[j].y, map_landmarks.landmark_list[k].x_f, map_landmarks.landmark_list[k].y_f); 
-        // cout<<distance<<endl;
+        double distance = dist(current_transformation.x, current_transformation.y, map_landmarks.landmark_list[k].x_f, map_landmarks.landmark_list[k].y_f); 
         // update min distance and index if this is the new min
         if (distance < min_distance) {
           min_distance = distance;
@@ -152,18 +154,26 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
         }
       }
       // CALCULATE WEIGHT
-      exponent_x = (o_x - map_landmarks.landmark_list[min_index].x_f) * (o_x - map_landmarks.landmark_list[min_index].x_f)/ (2*std_landmark[0]*std_landmark[0]);
-      exponent_y = (o_y - map_landmarks.landmark_list[min_index].y_f) * (o_y - map_landmarks.landmark_list[min_index].y_f)/ (2*std_landmark[1]*std_landmark[1]);
+      // set values
+      // new x_i (or y_i) is location of observation in map space now
+      // mu_x is (or mu_y) is location of closest landmark in map space
+      double x_i = current_transformation.x;
+      double mu_x = map_landmarks.landmark_list[min_index].x_f;
+      double y_i = current_transformation.y;
+      double mu_y = map_landmarks.landmark_list[min_index].y_f;
+
+      // calculate exponent
+      exponent_x = (x_i - mu_x) * (x_i - mu_x)/ (exponent_x_normalizer);
+      exponent_y = (y_i - mu_y) * (y_i - mu_y)/ (exponent_y_normalizer);
       exponent = -(exponent_x + exponent_y);
-      // cout<<particle_weight<<" "<<exponent_x<<" "<<exponent_y<<" "<<exponent<<" "<<endl;
       particle_weight *= normalizer * exp(exponent);
       map_associations.push_back(min_index);
-      cout<<min_distance<<endl;
 
     }
     // Add index to the map associations
-
+    particles[i].associations = map_associations;
     particles[i].weight = particle_weight;
+    weights[i] = particle_weight;
   }
 }
 
