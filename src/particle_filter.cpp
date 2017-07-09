@@ -128,8 +128,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   double exponent_y;
   double exponent;
 
-
-
   // loop over all particles
   for (int i = 0; i < particles.size(); i++) {
     // declare vector and LandmarkObs to keep track of translations
@@ -139,14 +137,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     std::vector<LandmarkObs> transformed_obs;
     long double particle_weight = 1;
 
+    double p_x = particles[i].x;
+    double p_y = particles[i].y;
+    double p_theta = particles[i].theta;
+
     // loop over all observations for each particle
     for (int j = 0; j < observations.size(); j++) {
       // set x, y, and theta values
       double o_x = observations[j].x;
       double o_y = observations[j].y;
-      double p_x = particles[i].x;
-      double p_y = particles[i].y;
-      double p_theta = particles[i].theta;
 
       // calculate transformation
       current_transformation.x = o_x * cos(p_theta) - o_y * sin(p_theta) + p_x;
